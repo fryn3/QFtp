@@ -1,7 +1,15 @@
 #include "ftpmodel.h"
 
+#include <array>
+#include <QDir>
 #include <QDebug>
 
+const std::array<QString, FtpModel::FTP_ROLE_COUNT>
+        FtpModel::FTP_ROLE_STR {
+    "isDir",
+    "name",
+    "size"
+};
 
 FtpModel::FtpModel(QObject *parent)
     : FtpModel(false, parent) { }
@@ -19,6 +27,16 @@ FtpModel::FtpModel(bool isTable, QObject *parent)
     connect(_ftp, &QFtp::done, this, &FtpModel::doneSlot);
 }
 
+int FtpModel::findName(QString name) const
+{
+    for (int i = 0; i < _rows.size(); ++i) {
+        if (_rows.at(i).name() == name) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 int FtpModel::rowCount(const QModelIndex &) const
 {
     return _rows.size();
@@ -34,13 +52,13 @@ QVariant FtpModel::data(const QModelIndex &index, int role) const
     if (!index.isValid()
             || index.row() >= rowCount()
             || index.column() >= columnCount()
-            || (role != Qt::DisplayRole && role < Qt::UserRole)) {
+            || (role != Qt::DisplayRole && role <= Qt::UserRole)) {
         return QVariant();
     }
-    if (_isTable && role < FtpBegin) {
+    if (_isTable && role < FtpRoleBegin) {
         qDebug() << role;
         Q_ASSERT(role == Qt::DisplayRole);
-        return data(this->index(index.row(), 0), index.column() + FtpBegin);
+        return data(this->index(index.row(), 0), index.column() + FtpRoleBegin);
     }
     Q_ASSERT(index.column() == 0);
     switch (role) {
@@ -55,6 +73,14 @@ QVariant FtpModel::data(const QModelIndex &index, int role) const
         break;
     }
     return _rows.at(index.row()).name();
+}
+
+QHash<int, QByteArray> FtpModel::roleNames() const {
+    QHash<int, QByteArray> r;
+    for (int i = FtpRoleBegin; i < FtpRoleEnd; ++i) {
+        r.insert(i, FTP_ROLE_STR.at(i - FtpRoleBegin).toUtf8());
+    }
+    return r;
 }
 
 int FtpModel::setProxy(const QString &host, quint16 port)
@@ -104,7 +130,7 @@ int FtpModel::list(const QString &dir)
 int FtpModel::cd(const QString &dir)
 {
     auto c = _ftp->cd(dir);
-    _commandsQueue[c] = QFtp::Command::Cd;
+    _commandsQueue[c] = {QFtp::Command::Cd, dir};
     return c;
 }
 
@@ -199,6 +225,18 @@ QString FtpModel::errorString() const
     return _ftp->errorString();
 }
 
+bool FtpModel::isDone() const
+{
+    return _lastCommand.command == QFtp::None
+            && _commandsQueue.isEmpty();
+}
+
+QString FtpModel::path() const
+{
+    static const auto SEP = QDir::separator();
+    return QDir::cleanPath(_path.join(SEP));
+}
+
 void FtpModel::abort()
 {
     return _ftp->abort();
@@ -245,8 +283,8 @@ void FtpModel::rawCommandReplySlot(int replyCode, const QString &detail)
 void FtpModel::commandStartedSlot(int id)
 {
     Q_ASSERT(_commandsQueue.firstKey() == id);
-    _lastCommand = _commandsQueue[id];
-    switch(_lastCommand) {
+    _lastCommand = _commandsQueue[id].command;
+    switch(_lastCommand.command) {
     case QFtp::List:
         beginResetModel();
         _rows.clear();
@@ -275,17 +313,55 @@ void FtpModel::commandStartedSlot(int id)
 
 void FtpModel::commandFinishedSlot(int id, bool error)
 {
+    qDebug() << __FILE__ << __LINE__ << _lastCommand.command << id << error;
+    if (error) {
+        qDebug() << "lastCommand = " << _lastCommand.command << ": " << _ftp->errorString();
+        emit errorChanged();
+    } else {
+        switch(_lastCommand.command) {
+        case QFtp::ConnectToHost: {
+            _path.clear();
+            _path.append("");
+            emit pathChanged();
+            break;
+        }
+        case QFtp::Close: {
+            _path.clear();
+            emit pathChanged();
+            beginResetModel();
+            _rows.clear();
+            endResetModel();
+            break;
+        }
+        case QFtp::Cd: {
+            _path.append(_lastCommand.cdDir);
+            emit pathChanged();
+            break;
+        }
+        case QFtp::List:
+        case QFtp::None:
+        case QFtp::SetTransferMode:
+        case QFtp::SetProxy:
+        case QFtp::Login:
+        case QFtp::Get:
+        case QFtp::Put:
+        case QFtp::Remove:
+        case QFtp::Mkdir:
+        case QFtp::Rmdir:
+        case QFtp::Rename:
+        case QFtp::RawCommand:
+            break;
+        }
+    }
     _lastCommand = QFtp::None;
     emit commandFinished(id, error);
-    if (error) {
-        qDebug() << _ftp->errorString();
-    }
 }
 
 void FtpModel::doneSlot(bool error)
 {
+    qDebug() << __FILE__ << __LINE__ << error;
+    if (error) {
+        emit errorChanged();
+    }
     emit done(error);
 }
-
-
-

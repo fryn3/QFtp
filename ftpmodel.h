@@ -9,23 +9,29 @@ class FtpModelPrivate;
 class FtpModel : public QAbstractTableModel
 {
     Q_OBJECT
+    Q_PROPERTY(QString path READ path NOTIFY pathChanged FINAL)
 public:
     enum FtpModelRole {
-        FtpBegin = Qt::UserRole,
+        FtpRoleBegin = Qt::UserRole + 1,
 
-        FtpIsDir = FtpBegin,
+        FtpIsDir = FtpRoleBegin,
         FtpNameRole,
         FtpSizeRole,
 
-        FtpEnd
+        FtpRoleEnd
     };
-    static constexpr int FTP_ROLE_COUNT = FtpEnd - FtpBegin;
+    static constexpr int FTP_ROLE_COUNT = FtpRoleEnd - FtpRoleBegin;
+    static const std::array<QString, FTP_ROLE_COUNT> FTP_ROLE_STR;
 
     FtpModel(QObject *parent = nullptr);
     FtpModel(bool isTable, QObject *parent = nullptr);
+
+    int findName(QString name) const;
+
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    QHash<int, QByteArray> roleNames() const override;
 
     int setProxy(const QString &host, quint16 port);
     int connectToHost(const QString &host, quint16 port=21);
@@ -50,6 +56,8 @@ public:
     QFtp::State state() const;
     QFtp::Error error() const;
     QString errorString() const;
+    bool isDone() const;
+    QString path() const;
 
 public slots:
     void abort();
@@ -74,10 +82,24 @@ signals:
     void commandFinished(int, bool);
     void done(bool);
 
+    void errorChanged();
+    void pathChanged();
+
 private:
+    struct CommandQueue {
+        CommandQueue(QFtp::Command c) : command(c) {}
+        CommandQueue(QFtp::Command c, QString dir) : command(c), cdDir(dir) {}
+        CommandQueue() = default;
+        // Команда, в очереди.
+        QFtp::Command command;
+        // Для команды cd сохраняем путь.
+        QString cdDir;
+    };
+
     bool _isTable = false;
-    QFtp::Command _lastCommand;
-    QList<QUrlInfo> _rows;
-    QMap<int, QFtp::Command> _commandsQueue;
+    CommandQueue _lastCommand {};
+    QVector<QUrlInfo> _rows;
+    QMap<int, CommandQueue> _commandsQueue;
     QFtp *_ftp;
+    QStringList _path;
 };
