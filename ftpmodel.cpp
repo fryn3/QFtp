@@ -365,3 +365,8 @@ void FtpModel::doneSlot(bool error)
     }
     emit done(error);
 }
+
+const QVector<QUrlInfo> &FtpModel::files() const
+{
+    return _rows;
+}

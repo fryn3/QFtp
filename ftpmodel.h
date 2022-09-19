@@ -59,6 +59,8 @@ public:
     bool isDone() const;
     QString path() const;
 
+    const QVector<QUrlInfo> &files() const;
+
 public slots:
     void abort();
 
