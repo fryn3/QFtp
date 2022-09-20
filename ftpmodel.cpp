@@ -259,8 +259,6 @@ void FtpModel::listInfoSlot(const QUrlInfo &info)
 {
     beginInsertRows(QModelIndex(), _rows.size(), _rows.size());
     _rows.push_back(info);
-    qDebug() << info.name() << info.group() << info.isValid()
-             << info.lastModified() << info.lastRead();
     endInsertRows();
     emit listInfo(info);
 }
@@ -283,6 +281,7 @@ void FtpModel::rawCommandReplySlot(int replyCode, const QString &detail)
 void FtpModel::commandStartedSlot(int id)
 {
     Q_ASSERT(_commandsQueue.firstKey() == id);
+
     _lastCommand = _commandsQueue[id].command;
     switch(_lastCommand.command) {
     case QFtp::List:
@@ -316,6 +315,7 @@ void FtpModel::commandFinishedSlot(int id, bool error)
     qDebug() << __FILE__ << __LINE__ << _lastCommand.command << id << error;
     if (error) {
         qDebug() << "lastCommand = " << _lastCommand.command << ": " << _ftp->errorString();
+        _commandsQueue.clear();
         emit errorChanged();
     } else {
         switch(_lastCommand.command) {
