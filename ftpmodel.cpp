@@ -239,6 +239,7 @@ QString FtpModel::path() const
 
 void FtpModel::abort()
 {
+    _commandsQueue.clear();
     return _ftp->abort();
 }
 
