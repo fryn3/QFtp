@@ -942,12 +942,12 @@ void QFtpPI::readyRead()
             }
         }
         QString endOfMultiLine;
-        endOfMultiLine[0] = '0' + replyCode[0];
-        endOfMultiLine[1] = '0' + replyCode[1];
-        endOfMultiLine[2] = '0' + replyCode[2];
-        endOfMultiLine[3] = QLatin1Char(' ');
+        endOfMultiLine.replace(0, 1, '0' + replyCode[0]);
+        endOfMultiLine.replace(1, 1, '0' + replyCode[1]);
+        endOfMultiLine.replace(2, 1, '0' + replyCode[2]);
+        endOfMultiLine.replace(3, 1, QLatin1Char(' '));
         QString lineCont(endOfMultiLine);
-        lineCont[3] = QLatin1Char('-');
+        lineCont.replace(3, 1, QLatin1Char('-'));
         QString lineLeft4 = line.left(4);
 
         while (lineLeft4 != endOfMultiLine) {
