@@ -923,6 +923,9 @@ void QFtpPI::readyRead()
     if (waitForDtpToClose)
         return;
 
+    if (abortState != None)
+        return;
+
     while (commandSocket.canReadLine()) {
         // read line with respect to line continuation
         QString line = QString::fromLatin1(commandSocket.readLine());
