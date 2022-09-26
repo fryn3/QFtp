@@ -10,6 +10,7 @@ class FtpModel : public QAbstractTableModel
 {
     Q_OBJECT
     Q_PROPERTY(QString path READ path NOTIFY pathChanged FINAL)
+    Q_PROPERTY(int rowCount READ rowCount NOTIFY rowCountChanged FINAL)
 public:
     enum FtpModelRole {
         FtpRoleBegin = Qt::UserRole + 1,
@@ -75,6 +76,7 @@ private slots:
     void doneSlot(bool error);
 
 signals:
+    void rowCountChanged();
     void stateChanged(QFtp::State);
     void listInfo(const QUrlInfo&);
     void readyRead();

@@ -25,6 +25,9 @@ FtpModel::FtpModel(bool isTable, QObject *parent)
     connect(_ftp, &QFtp::commandStarted, this, &FtpModel::commandStartedSlot);
     connect(_ftp, &QFtp::commandFinished, this, &FtpModel::commandFinishedSlot);
     connect(_ftp, &QFtp::done, this, &FtpModel::doneSlot);
+    connect(this, &QAbstractItemModel::rowsInserted, this, &FtpModel::rowCountChanged);
+    connect(this, &QAbstractItemModel::rowsRemoved, this, &FtpModel::rowCountChanged);
+    connect(this, &QAbstractItemModel::modelReset, this, &FtpModel::rowCountChanged);
 }
 
 int FtpModel::findName(QString name) const
