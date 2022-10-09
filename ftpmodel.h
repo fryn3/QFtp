@@ -12,17 +12,36 @@ class FtpModel : public QAbstractTableModel
     Q_PROPERTY(QString path READ path NOTIFY pathChanged FINAL)
     Q_PROPERTY(int rowCount READ rowCount NOTIFY rowCountChanged FINAL)
 public:
+
+    enum class FileState {
+        None,
+        Downloading,
+        Downloaded,
+        Failed
+    };
+
     enum FtpModelRole {
         FtpRoleBegin = Qt::UserRole + 1,
 
         FtpIsDir = FtpRoleBegin,
         FtpNameRole,
         FtpSizeRole,
+        FtpFileStateRole,
+        FtpProgressDoneRole,
+        FtpProgressTotalRole,
 
         FtpRoleEnd
     };
+
     static constexpr int FTP_ROLE_COUNT = FtpRoleEnd - FtpRoleBegin;
     static const std::array<QString, FTP_ROLE_COUNT> FTP_ROLE_STR;
+
+    struct RowStruct {
+        QUrlInfo info;
+        FileState state = FileState::None;
+        qint64 done = 0;
+        qint64 total = 1;
+    };
 
     FtpModel(QObject *parent = nullptr);
     FtpModel(bool isTable, QObject *parent = nullptr);
@@ -60,10 +79,18 @@ public:
     bool isDone() const;
     QString path() const;
 
-    const QVector<QUrlInfo> &files() const;
+    const QVector<RowStruct> &files() const;
+
+    bool freeze() const;
 
 public slots:
     void abort();
+
+protected:
+    void timerEvent(QTimerEvent *event) override;
+
+private:
+    void setFreeze(bool newFreeze);
 
 private slots:
     void stateChangedSlot(QFtp::State state);
@@ -89,21 +116,33 @@ signals:
     void errorChanged();
     void pathChanged();
 
+    void freezeChanged();
+
 private:
     struct CommandQueue {
         CommandQueue(QFtp::Command c) : command(c) {}
-        CommandQueue(QFtp::Command c, QString dir) : command(c), cdDir(dir) {}
+        CommandQueue(QFtp::Command c, QStringList argParams) : command(c), params(argParams) {}
         CommandQueue() = default;
         // Команда, в очереди.
         QFtp::Command command;
         // Для команды cd сохраняем путь.
-        QString cdDir;
+        QStringList params;
     };
 
     bool _isTable = false;
     CommandQueue _lastCommand {};
-    QVector<QUrlInfo> _rows;
+    QVector<RowStruct> _rows;
     QMap<int, CommandQueue> _commandsQueue;
     QFtp *_ftp;
     QStringList _path;
+    int _getRowIndex = -1;
+    int _getTimerId = 0;
+    // QFTP не отрабатывает abort (не вызываются сигналы окончания).
+    // Добавил костыль, если срабатывает сторожевой таймер, freeze
+    // выставляется true.
+    bool _freeze = false;
+
+    // Время сторожевого таймера на скачивание.
+    static constexpr int _GET_TIMEOUT = 30000;
+
 };
